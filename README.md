@@ -60,24 +60,6 @@ graph TD
 
 ---
 
-## 📸 Application Screenshots
-
-<p align="center">
-  <img src="assets/akademik%20sohbet%20chatbot.jpg" width="48%" alt="Academic Chatbot" />
-  <img src="assets/ayet,%20hadis,%20sahis%20analitigi.jpg" width="48%" alt="Ayet, Hadis ve Şahıs Analitiği" />
-</p>
-<p align="center">
-  <img src="assets/otomatik%20co-writer.jpg" width="48%" alt="Academic Co-Writer" />
-  <img src="assets/ag%20haritasi.jpg" width="48%" alt="İnteraktif Ağ Haritası" />
-</p>
-Dosyayı kaydedin (Cmd + S) ve kapatın.
-Şimdi bu ufacık düzeltmeyi GitHub'a göndermek için terminalde şu komutları koşturun:
-git add README.md
-git commit -m "docs: update README image paths to match actual screenshot assets"
-git push origin main
-
----
-
 ## 🛡️ Enterprise Features & IP Protection
 
 1. **IP & Proprietary Data Protection:** 
@@ -89,6 +71,17 @@ git push origin main
 
 ---
 
+
+## 📓 Obsidian Vault Integration & Wiki-Link Parser
+
+One of the most unique capabilities of this platform is its **native, production-ready Obsidian Vault Ingestion Pipeline (`obsidian_rag_pipeline.py`)**. Rather than forcing researchers to query isolated PDFs, the system directly ingests live personal academic vaults:
+
+1. **Wikilink Extraction:** The parser scans markdown files using regular expressions to extract bidirectional internal links (e.g., `[[Yakin]]`, `[[Nefs]]`).
+2. **Metadata Graph Mapping:** It preserves these links inside ChromaDB's metadata dictionary (`"links": "Yakin, Nefs"`), enabling network graphs and semantic adjacency analysis.
+3. **Advanced Regex Cleaning:** Double-bracket styling is programmatically cleaned (e.g., `[[Kavram|Alias]]` -> `Alias`) to generate high-fidelity, noise-free embeddings.
+4. **E5-Large Prefix Formatting:** Documents are automatically formatted with the `passage: ` prefix to comply with SOTA retrieval requirements.
+
+---
 ## 📊 Automated RAG Evaluation & Performance Benchmarks
 
 The platform includes a dedicated **RAG Evaluation Suite (`gazali_rag_evaluator.py`)** that tests retrieval precision, keyword recall, and query latency over a golden dataset. 
