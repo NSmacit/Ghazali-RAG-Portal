@@ -60,6 +60,24 @@ graph TD
 
 ---
 
+## 📸 Application Screenshots
+
+<p align="center">
+  <img src="assets/akademik%20sohbet%20chatbot.jpg" width="48%" alt="Academic Chatbot" />
+  <img src="assets/ayet,%20hadis,%20sahis%20analitigi.jpg" width="48%" alt="Ayet, Hadis ve Şahıs Analitiği" />
+</p>
+<p align="center">
+  <img src="assets/otomatik%20co-writer.jpg" width="48%" alt="Academic Co-Writer" />
+  <img src="assets/ag%20haritasi.jpg" width="48%" alt="İnteraktif Ağ Haritası" />
+</p>
+Dosyayı kaydedin (Cmd + S) ve kapatın.
+Şimdi bu ufacık düzeltmeyi GitHub'a göndermek için terminalde şu komutları koşturun:
+git add README.md
+git commit -m "docs: update README image paths to match actual screenshot assets"
+git push origin main
+
+---
+
 ## 🛡️ Enterprise Features & IP Protection
 
 1. **IP & Proprietary Data Protection:** 
