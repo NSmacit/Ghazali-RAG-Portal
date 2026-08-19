@@ -88,6 +88,10 @@ graph TD
 
 One of the most unique capabilities of this platform is its **native, production-ready Obsidian Vault Ingestion Pipeline (`obsidian_rag_pipeline.py`)**. Rather than forcing researchers to query isolated PDFs, the system directly ingests live personal academic vaults:
 
+<p align="center">
+  <img src="assets/obsidian_vault.jpg" width="85%" alt="Obsidian Vault & Wiki-Links" />
+</p>
+
 1. **Wikilink Extraction:** The parser scans markdown files using regular expressions to extract bidirectional internal links (e.g., `[[Yakin]]`, `[[Nefs]]`).
 2. **Metadata Graph Mapping:** It preserves these links inside ChromaDB's metadata dictionary (`\"links\": \"Yakin, Nefs\"`), enabling network graphs and semantic adjacency analysis.
 3. **Advanced Regex Cleaning:** Double-bracket styling is programmatically cleaned (e.g., `[[Kavram|Alias]]` -> `Alias`) to generate high-fidelity, noise-free embeddings.
