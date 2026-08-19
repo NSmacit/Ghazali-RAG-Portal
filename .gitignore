@@ -5,9 +5,7 @@ gazali_chroma_db/
 *.docx
 *.md
 *.html
-*.png
-*.jpg
-*.jpeg
+
 
 # İstisna: README ve belgeler
 !rag_evaluation_report.md
