@@ -60,6 +60,19 @@ graph TD
 
 ---
 
+## 📸 Application Screenshots
+
+<p align="center">
+  <img src="assets/akademik%20sohbet%20chatbot.jpg" width="48%" alt="Academic Chatbot" />
+  <img src="assets/ayet,%20hadis,%20sahis%20analitigi.jpg" width="48%" alt="Ayet, Hadis ve Şahıs Analitiği" />
+</p>
+<p align="center">
+  <img src="assets/otomatik%20co-writer.jpg" width="48%" alt="Academic Co-Writer" />
+  <img src="assets/ag%20haritasi.jpg" width="48%" alt="İnteraktif Ağ Haritası" />
+</p>
+
+---
+
 ## 🛡️ Enterprise Features & IP Protection
 
 1. **IP & Proprietary Data Protection:** 
@@ -71,40 +84,40 @@ graph TD
 
 ---
 
-
 ## 📓 Obsidian Vault Integration & Wiki-Link Parser
 
 One of the most unique capabilities of this platform is its **native, production-ready Obsidian Vault Ingestion Pipeline (`obsidian_rag_pipeline.py`)**. Rather than forcing researchers to query isolated PDFs, the system directly ingests live personal academic vaults:
 
 1. **Wikilink Extraction:** The parser scans markdown files using regular expressions to extract bidirectional internal links (e.g., `[[Yakin]]`, `[[Nefs]]`).
-2. **Metadata Graph Mapping:** It preserves these links inside ChromaDB's metadata dictionary (`"links": "Yakin, Nefs"`), enabling network graphs and semantic adjacency analysis.
+2. **Metadata Graph Mapping:** It preserves these links inside ChromaDB's metadata dictionary (`\"links\": \"Yakin, Nefs\"`), enabling network graphs and semantic adjacency analysis.
 3. **Advanced Regex Cleaning:** Double-bracket styling is programmatically cleaned (e.g., `[[Kavram|Alias]]` -> `Alias`) to generate high-fidelity, noise-free embeddings.
 4. **E5-Large Prefix Formatting:** Documents are automatically formatted with the `passage: ` prefix to comply with SOTA retrieval requirements.
 
 ---
+
 ## 📊 Automated RAG Evaluation & Performance Benchmarks
 
 The platform includes a dedicated **RAG Evaluation Suite (`gazali_rag_evaluator.py`)** that tests retrieval precision, keyword recall, and query latency over a golden dataset. 
 
 ### Core Evaluation Metrics (Actual Run Results)
 
-| Metric | Target | Verified Score | Status |
-| :--- | :--- | :--- | :--- |
-| **Retrieval Hit Rate (Recall)** | > 90% | **100% (4/4 Cases)** | ✅ EXCELLENT |
-| **Steady-State Query Latency** | < 500 ms | **~335.6 ms** | ✅ ENTERPRISE |
-| **Cross-Lingual Translation Precision** | > 95% | **100% (Arabic `الشك` ➡️ Turkish)** | ✅ VERIFIED |
-| **Total Corpus Coverage** | 100% | **3,883 Passages** | ✅ COMPLETE |
+| Metric | Target | Verified Score | Status |\
+| :--- | :--- | :--- | :--- |\
+| **Retrieval Hit Rate (Recall)** | > 90% | **100% (4/4 Cases)** | ✅ EXCELLENT |\
+| **Steady-State Query Latency** | < 500 ms | **~335.6 ms** | ✅ ENTERPRISE |\
+| **Cross-Lingual Translation Precision** | > 95% | **100% (Arabic `الشك` ➡️ Turkish)** | ✅ VERIFIED |\
+| **Total Corpus Coverage** | 100% | **3,883 Passages** | ✅ COMPLETE |\
 
 ### Test Case Breakdown
 
 * **[TC-001] Sufi Epistemology Test (Kimyâ-yı Saâdet):**
-  * *Query:* `"kalbin hakikati ve marifetü'n-nefs"`
+  * *Query:* `\"kalbin hakikati ve marifetü'n-nefs\"`
   * *Latency:* `422.8 ms` (including warm-up) | *Keyword Recall:* `100%` | *Status:* ✅ **PASSED**
 * **[TC-002] Cross-Lingual Semantic Test (Arabic ➡️ Turkish):**
-  * *Query:* `"الشك"` (Doubt / Skepticism)
-  * *Latency:* `304.2 ms` | *Keyword Recall:* `100%` (Correctly mapped to "şüphe", "kriz") | *Status:* ✅ **PASSED**
+  * *Query:* `\"الشك\"` (Doubt / Skepticism)
+  * *Latency:* `304.2 ms` | *Keyword Recall:* `100%` (Correctly mapped to \"şüphe\", \"kriz\") | *Status:* ✅ **PASSED**
 * **[TC-004] Philosophical Dispute Test (Filozofların Tutarsızlığı):**
-  * *Query:* `"filozofların tutarsızlığı ve metafizik iddialar"`
+  * *Query:* `\"filozofların tutarsızlığı ve metafizik iddialar\"`
   * *Latency:* `279.9 ms` | *Keyword Recall:* `100%` (Retrieved from *Tehâfütü'l-Felâsife*) | *Status:* ✅ **PASSED**
 
 ---
