@@ -1,0 +1,24 @@
+version: '3.8'
+
+# =====================================================================
+# ISLAMICATE DH - GAZALİ PORTALI: DOCKER COMPOSE CONFIGURATION
+# =====================================================================
+# Bu dosya, ChromaDB ve Streamlit servislerinin tek komutla ayağa 
+# kalkmasını sağlar. Lokal veritabanını container içine güvenle bağlar.
+# =====================================================================
+
+services:
+  gazali-portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gazali_portal_app
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+      # Veritabanının konteyner kapandıktan sonra da korunması için volume bağı
+      - ./gazali_chroma_db:/app/gazali_chroma_db
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    restart: unless-stopped
