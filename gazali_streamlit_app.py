@@ -11,6 +11,10 @@ import json
 import pandas as pd
 from gazali_semantic_cache import GazaliSemanticCache
 
+# Tek kaynak: hibrit arama motoru mantigi src/search.py'da yasar (tek noktada bakim).
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from src.search import run_hybrid_search as _src_hybrid_search
+
 
 # =====================================================================
 # ISLAMICATE DH - GAZALİ PORTALI: STREAMLIT CO-WRITER & CHATBOT (v1)
@@ -260,144 +264,16 @@ with st.sidebar:
 # =====================================================================
 # 3.5. ARAPÇA-TÜRKÇE ÇAPRAZ DİLLİ (CROSS-LINGUAL) ARAMA SÖZLÜĞÜ VE MOTORU
 # =====================================================================
-arabic_to_turkish_dict = {
-    "العلم": "ilim bilgi muallim taallüm",
-    "العمل": "amel eylem pratik ibadet",
-    "القلب": "kalp gönül cevher tasfiye",
-    "النفس": "nefis nefs ruh kendini benlik",
-    "العقل": "akıl rasyonel düşünce fehim",
-    "السعادة": "saadet mutluluk kurtuluş necât",
-    "الشك": "şüphe tereddüt şüphecilik istidlal",
-    "اليقين": "yakin yakinî kesin bilgi hakikat",
-    "الحس": "hissiyyat duyular his duyu organları",
-    "الرياضة": "riyazet nefs terbiyesi tefekkür",
-    "الوسوسة": "vesvese kuruntu şeytan vesvesesi",
-    "معرفة": "marifet bilmek tanımak irfan",
-    "معرفة النفس": "kendini bilmek marifet-i nefs nefsini bilmek",
-    "معرفة الله": "Allah'ı bilmek marifetullah",
-    "الدنيا": "dünya hayatı fani geçici alem",
-    "الآخرة": "ahiret beka alemi ebediyet",
-    "الولد": "veled çocuk oğul ey oğul",
-    "نصيحة": "nasihat öğüt vasiyet",
-    "تصوف": "tasavvuf ahlak zühd takva",
-    "طهارة": "taharet temizlik kalb tasfiyesi",
-    "عشق": "aşk muhabbet sevgi",
-    "نور": "nur ışık ilahi aydınlanma"
-}
-
-def translate_expand_query(query):
-    """Sorguda Arapça karakterler varsa yerel sözlük ve Gemini yardımıyla Türkçe genişletme yapar."""
-    is_arabic = bool(re.search(r'[\u0600-\u06FF]', query))
-    if not is_arabic:
-        return query, False, ""
-        
-    # 1. Pürüzleri temizleme (Arapça harekeleri ve noktalama işaretlerini koruyarak temizle)
-    clean_q = re.sub(r'[^\w\s\u0600-\u06FF]', '', query).strip()
-    
-    # Doğrudan tam eşleşme kontrolü
-    translated = arabic_to_turkish_dict.get(clean_q, "")
-    
-    # Kelime bazlı çeviri ve genişletme (tam eşleşme yoksa)
-    if not translated:
-        words = clean_q.split()
-        tr_words = []
-        for w in words:
-            tr_w = arabic_to_turkish_dict.get(w, "")
-            if tr_w:
-                tr_words.append(tr_w)
-        if tr_words:
-            translated = " ".join(tr_words)
-            
-    # 2. Gemini ile dinamik çeviri ve akademik genişletme (API anahtarı aktifse)
-    dynamic_translation = ""
-    if st.session_state.get("api_key_valid", False):
-        try:
-            model = genai.GenerativeModel(st.session_state.get("selected_model"))
-            prompt = f"Translate the following classical Arabic Islamic/philosophical term or question into clean Turkish search keywords for a book database. Return ONLY the translated Turkish keywords, no explanations:\n{query}"
-            response = model.generate_content(prompt)
-            dynamic_translation = response.text.strip().replace("\n", " ")
-        except Exception:
-            pass
-            
-    # Sonuçları birleştir
-    combined_translation = translated
-    if dynamic_translation:
-        if combined_translation:
-            combined_translation += " " + dynamic_translation
-        else:
-            combined_translation = dynamic_translation
-            
-    if not combined_translation:
-        combined_translation = query  # Fallback
-        
-    return combined_translation, True, clean_q
+# NOT: Capraz-dilli ceviri sozlugu artik config/settings.py:ARABIC_TO_TURKISH_DICT
+# icinde; Arapca ceviri + modern Turkce klasik-terim genisletme mantigi ise tek
+# kaynak olarak src/search.py icinde yasar. Buradaki eski kopyalar kaldirildi.
 
 def run_hybrid_search(query, top_k=4):
-    """BM25 ve Vektör (E5) sıralamalarını RRF formülüyle sentezler. Arapça sorgularda çapraz dilli arama yapar."""
-    if not collection or not bm25_engine or not all_data:
-        return []
-        
-    # Çapraz dilli arama analizi
-    bm25_query = query
-    vector_query = query
-    
-    translated_q, is_arabic, original_arabic = translate_expand_query(query)
-    if is_arabic:
-        bm25_query = translated_q
-        vector_query = f"{query} {translated_q}"
-        st.info(f"🌐 **Arapça Arama Tespit Edildi:**\n• Orijinal Arapça: `{query}`\n• Türkçe Genişletme: `{translated_q}`\n\n*Çapraz Dilli (Cross-lingual) Hibrit motorumuz, hem orijinal terimi vektör uzayında tarar hem de otomatik çeviri üzerinden yerel BM25 indekslemesi gerçekleştirir.*")
-        
-    # 1. BM25 Skorlarını Hesapla
-    bm25_scores = bm25_engine.get_scores(bm25_query)
-    bm25_ranked = sorted(range(len(bm25_scores)), key=lambda k: bm25_scores[k], reverse=True)
-    
-    # 2. Vektör (E5) Skorlarını Hesapla
-    formatted_query = f"query: {vector_query}"
-    query_vector = embed_model.encode(formatted_query).tolist()
-    vector_results = collection.query(
-        query_embeddings=[query_vector],
-        n_results=len(all_data["documents"])
-    )
-    
-    vector_order = vector_results["ids"][0]
-    vector_ranked = [all_data["ids"].index(vid) for vid in vector_order]
-    
-    # 3. Reciprocal Rank Fusion (RRF) Sentezi
-    rrf_scores = {}
-    k_constant = 60
-    
-    # BM25 Ranks
-    for rank, idx in enumerate(bm25_ranked):
-        rrf_scores[idx] = rrf_scores.get(idx, 0.0) + (1.0 / (k_constant + rank + 1))
-        
-    # Vector Ranks
-    for rank, idx in enumerate(vector_ranked):
-        rrf_scores[idx] = rrf_scores.get(idx, 0.0) + (1.0 / (k_constant + rank + 1))
-        
-    # En iyi sonuçları sırala ve topla
-    top_indices = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)[:top_k]
-    
-    final_docs = []
-    for idx in top_indices:
-        metadata = all_data["metadatas"][idx]
-        text = all_data["documents"][idx]
-        
-        # Vektör ve BM25 sıralarını bulalım
-        v_rank = vector_ranked.index(idx) + 1 if idx in vector_ranked else "N/A"
-        b_rank = bm25_ranked.index(idx) + 1
-        
-        final_docs.append({
-            "text": text,
-            "title": metadata.get("title", "Bilinmeyen"),
-            "book": metadata.get("book", ""),
-            "page": metadata.get("page", ""),
-            "links": metadata.get("links", ""),
-            "rrf_score": rrf_scores[idx],
-            "v_rank": v_rank,
-            "b_rank": b_rank
-        })
-        
-    return final_docs
+    """Tek kaynak hibrit arama motoruna (src/search.py) delege eder.
+    Arapca capraz-dilli arama ve modern Turkce klasik-terim genisletmesi orada
+    yonetilir; global asset'ler (embed_model, collection, bm25_engine, all_data)
+    bu dosyada kurulur."""
+    return _src_hybrid_search(embed_model, collection, bm25_engine, all_data, query, top_k)
 
 def generate_docx_stream(title, content):
     """Makaleyi doğrudan indirilebilir Word dosyasına dönüştürür."""
@@ -431,7 +307,6 @@ tab1, tab2, tab3, tab4 = st.tabs(["💬 Akademik Sohbet (Chatbot)", "✍️ Otom
 # TAB 1: AKADEMİK SOHBET (CHATBOT)
 # ---------------------------------------------------------------------
 
-
 with tab1:
     st.subheader("🤖 Hibrit Arama Destekli Soru-Cevap Motoru")
     st.caption("Gelişmiş BM25 kelime araması ve E5-Large anlamsal aramayı birleştirerek sıfır halüsinasyonla çalışır.")
@@ -439,7 +314,7 @@ with tab1:
     if not st.session_state.api_key_valid:
         st.info("👉 Devam etmek için lütfen sol panelden geçerli bir Gemini API anahtarı girin.")
     else:
-        # Eski sohbet geçmişini göster
+        # 1. Eski sohbet geçmişini göster (else altında 8 boşluk)
         for message in st.session_state.chat_history:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
@@ -449,11 +324,12 @@ with tab1:
                             source_header = f"📌 {doc['book']} | Sayfa: {doc['page']}" if doc['book'] else f"📌 Obsidian Notu: [[{doc['title']}]]"
                             st.markdown(f"**{source_header}** *(RRF Skoru: {doc['rrf_score']:.4f}, Vektör Sırası: {doc['v_rank']}, BM25 Sırası: {doc['b_rank']})*")
                             st.caption(f"\"{doc['text']}\"")
-
-    if "semantic_cache" not in st.session_state:
-    st.session_state.semantic_cache = GazaliSemanticCache(threshold=0.94)                        
         
-        # Kullanıcı Girdisi
+        # 2. Önbellek Başlatma (Tam olarak 8 boşluk içeride - 'for' ile aynı hizada!)
+        if "semantic_cache" not in st.session_state:
+            st.session_state.semantic_cache = GazaliSemanticCache(threshold=0.94)                        
+        
+        # 3. Kullanıcı Girdisi (Tam olarak 8 boşluk içeride - 'if' ile aynı hizada!)
         user_query = st.chat_input("İmam Gazali felsefesi veya e-kitaplarınız hakkında sorun...")
         
         if user_query:
