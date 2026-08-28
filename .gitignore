@@ -1,6 +1,8 @@
 # Gazali Project Security Gitignore
 # 1. Yerel Veritabanı (Mülkiyet Koruması - Asla GitHub'a yüklenmez)
 gazali_chroma_db/
+gazali_chroma_db.backup/
+gazali_cache.db
 *.pdf
 *.docx
 *.md
