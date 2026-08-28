@@ -7,6 +7,10 @@ from sentence_transformers import SentenceTransformer
 import google.generativeai as genai
 from docx import Document
 import io
+import json
+import pandas as pd
+from gazali_semantic_cache import GazaliSemanticCache
+
 
 # =====================================================================
 # ISLAMICATE DH - GAZALİ PORTALI: STREAMLIT CO-WRITER & CHATBOT (v1)
@@ -160,11 +164,38 @@ if "selected_model" not in st.session_state:
 if "available_models" not in st.session_state:
     st.session_state.available_models = []
 
+# Co-Writer ve NER durumlarını sekmeler arası geçişte korumak için saklayalım
+if "co_writer_result" not in st.session_state:
+    st.session_state.co_writer_result = None
+if "co_writer_topic_saved" not in st.session_state:
+    st.session_state.co_writer_topic_saved = None
+if "co_writer_format_saved" not in st.session_state:
+    st.session_state.co_writer_format_saved = None
+
+if "ner_results" not in st.session_state:
+    st.session_state.ner_results = None
+if "ner_raw_docs" not in st.session_state:
+    st.session_state.ner_raw_docs = None
+if "ner_topic_saved" not in st.session_state:
+    st.session_state.ner_topic_saved = None
+
 # =====================================================================
 # 3. YAN PANEL (SIDEBAR) - GÜVENLİK VE AYARLAR
 # =====================================================================
 with st.sidebar:
-    st.image("https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200&h=200", width=120)
+    # Gazali Avatar - Yerel dosya varsa yukle yoksa bizim urettigimiz dunya standardindaki bulut adresinden cek
+    avatar_filename = "gazali_avatar_v2.jpg"
+    # Hem eski hem yeni Streamlit sürümleriyle (use_column_width vs use_container_width) tam uyumluluk için try-except kullanıyoruz
+    if os.path.exists(avatar_filename):
+        try:
+            st.image(avatar_filename, use_container_width=True)
+        except TypeError:
+            st.image(avatar_filename, use_column_width=True)
+    else:
+        try:
+            st.image("https://lh3.googleusercontent.com/notebooklm/AKYWMX-1Hvp_4i-e2m2xMO2yCZQvlu0Dq6YH3N82xKnYbzuVmBO_a5leTcjlypD_WLjym7j4ZSLDCeXSgOyurMbZkWei8w59lZ0eclF1eBJtknDRkophMYKIXkMq9X2xmBRZgYb--mb3S5GDIYZOt2hQohhT-Oct2Q", use_container_width=True)
+        except TypeError:
+            st.image("https://lh3.googleusercontent.com/notebooklm/AKYWMX-1Hvp_4i-e2m2xMO2yCZQvlu0Dq6YH3N82xKnYbzuVmBO_a5leTcjlypD_WLjym7j4ZSLDCeXSgOyurMbZkWei8w59lZ0eclF1eBJtknDRkophMYKIXkMq9X2xmBRZgYb--mb3S5GDIYZOt2hQohhT-Oct2Q", use_column_width=True)
     st.title("🕌 Gazâlî Portal")
     st.caption("Digital Humanities & RAG Platform v1.0")
     st.write("---")
@@ -226,17 +257,102 @@ with st.sidebar:
 # =====================================================================
 # 4. YARDIMCI METODLAR (Arama ve Doküman Oluşturma)
 # =====================================================================
+# =====================================================================
+# 3.5. ARAPÇA-TÜRKÇE ÇAPRAZ DİLLİ (CROSS-LINGUAL) ARAMA SÖZLÜĞÜ VE MOTORU
+# =====================================================================
+arabic_to_turkish_dict = {
+    "العلم": "ilim bilgi muallim taallüm",
+    "العمل": "amel eylem pratik ibadet",
+    "القلب": "kalp gönül cevher tasfiye",
+    "النفس": "nefis nefs ruh kendini benlik",
+    "العقل": "akıl rasyonel düşünce fehim",
+    "السعادة": "saadet mutluluk kurtuluş necât",
+    "الشك": "şüphe tereddüt şüphecilik istidlal",
+    "اليقين": "yakin yakinî kesin bilgi hakikat",
+    "الحس": "hissiyyat duyular his duyu organları",
+    "الرياضة": "riyazet nefs terbiyesi tefekkür",
+    "الوسوسة": "vesvese kuruntu şeytan vesvesesi",
+    "معرفة": "marifet bilmek tanımak irfan",
+    "معرفة النفس": "kendini bilmek marifet-i nefs nefsini bilmek",
+    "معرفة الله": "Allah'ı bilmek marifetullah",
+    "الدنيا": "dünya hayatı fani geçici alem",
+    "الآخرة": "ahiret beka alemi ebediyet",
+    "الولد": "veled çocuk oğul ey oğul",
+    "نصيحة": "nasihat öğüt vasiyet",
+    "تصوف": "tasavvuf ahlak zühd takva",
+    "طهارة": "taharet temizlik kalb tasfiyesi",
+    "عشق": "aşk muhabbet sevgi",
+    "نور": "nur ışık ilahi aydınlanma"
+}
+
+def translate_expand_query(query):
+    """Sorguda Arapça karakterler varsa yerel sözlük ve Gemini yardımıyla Türkçe genişletme yapar."""
+    is_arabic = bool(re.search(r'[\u0600-\u06FF]', query))
+    if not is_arabic:
+        return query, False, ""
+        
+    # 1. Pürüzleri temizleme (Arapça harekeleri ve noktalama işaretlerini koruyarak temizle)
+    clean_q = re.sub(r'[^\w\s\u0600-\u06FF]', '', query).strip()
+    
+    # Doğrudan tam eşleşme kontrolü
+    translated = arabic_to_turkish_dict.get(clean_q, "")
+    
+    # Kelime bazlı çeviri ve genişletme (tam eşleşme yoksa)
+    if not translated:
+        words = clean_q.split()
+        tr_words = []
+        for w in words:
+            tr_w = arabic_to_turkish_dict.get(w, "")
+            if tr_w:
+                tr_words.append(tr_w)
+        if tr_words:
+            translated = " ".join(tr_words)
+            
+    # 2. Gemini ile dinamik çeviri ve akademik genişletme (API anahtarı aktifse)
+    dynamic_translation = ""
+    if st.session_state.get("api_key_valid", False):
+        try:
+            model = genai.GenerativeModel(st.session_state.get("selected_model"))
+            prompt = f"Translate the following classical Arabic Islamic/philosophical term or question into clean Turkish search keywords for a book database. Return ONLY the translated Turkish keywords, no explanations:\n{query}"
+            response = model.generate_content(prompt)
+            dynamic_translation = response.text.strip().replace("\n", " ")
+        except Exception:
+            pass
+            
+    # Sonuçları birleştir
+    combined_translation = translated
+    if dynamic_translation:
+        if combined_translation:
+            combined_translation += " " + dynamic_translation
+        else:
+            combined_translation = dynamic_translation
+            
+    if not combined_translation:
+        combined_translation = query  # Fallback
+        
+    return combined_translation, True, clean_q
+
 def run_hybrid_search(query, top_k=4):
-    """BM25 ve Vektör (E5) sıralamalarını RRF formülüyle sentezler."""
+    """BM25 ve Vektör (E5) sıralamalarını RRF formülüyle sentezler. Arapça sorgularda çapraz dilli arama yapar."""
     if not collection or not bm25_engine or not all_data:
         return []
         
+    # Çapraz dilli arama analizi
+    bm25_query = query
+    vector_query = query
+    
+    translated_q, is_arabic, original_arabic = translate_expand_query(query)
+    if is_arabic:
+        bm25_query = translated_q
+        vector_query = f"{query} {translated_q}"
+        st.info(f"🌐 **Arapça Arama Tespit Edildi:**\n• Orijinal Arapça: `{query}`\n• Türkçe Genişletme: `{translated_q}`\n\n*Çapraz Dilli (Cross-lingual) Hibrit motorumuz, hem orijinal terimi vektör uzayında tarar hem de otomatik çeviri üzerinden yerel BM25 indekslemesi gerçekleştirir.*")
+        
     # 1. BM25 Skorlarını Hesapla
-    bm25_scores = bm25_engine.get_scores(query)
+    bm25_scores = bm25_engine.get_scores(bm25_query)
     bm25_ranked = sorted(range(len(bm25_scores)), key=lambda k: bm25_scores[k], reverse=True)
     
     # 2. Vektör (E5) Skorlarını Hesapla
-    formatted_query = f"query: {query}"
+    formatted_query = f"query: {vector_query}"
     query_vector = embed_model.encode(formatted_query).tolist()
     vector_results = collection.query(
         query_embeddings=[query_vector],
@@ -309,11 +425,13 @@ def generate_docx_stream(title, content):
 st.title("🕌 İmam Gazâlî Akademik Araştırma Portalı")
 st.write("Klasik İslâmî teoloji, felsefe ve epistemoloji araştırmalarını yapay zekâ ile buluşturan yerel bilgi yönetim paneli.")
 
-tab1, tab2, tab3 = st.tabs(["💬 Akademik Sohbet (Chatbot)", "✍️ Otomatik Co-Writer", "📊 İnteraktif Kavram Ağ Haritası"])
+tab1, tab2, tab3, tab4 = st.tabs(["💬 Akademik Sohbet (Chatbot)", "✍️ Otomatik Co-Writer", "📊 İnteraktif Kavram Ağ Haritası", "📜 Ayet & Hadis & Şahıs Analitiği"])
 
 # ---------------------------------------------------------------------
 # TAB 1: AKADEMİK SOHBET (CHATBOT)
 # ---------------------------------------------------------------------
+
+
 with tab1:
     st.subheader("🤖 Hibrit Arama Destekli Soru-Cevap Motoru")
     st.caption("Gelişmiş BM25 kelime araması ve E5-Large anlamsal aramayı birleştirerek sıfır halüsinasyonla çalışır.")
@@ -331,6 +449,9 @@ with tab1:
                             source_header = f"📌 {doc['book']} | Sayfa: {doc['page']}" if doc['book'] else f"📌 Obsidian Notu: [[{doc['title']}]]"
                             st.markdown(f"**{source_header}** *(RRF Skoru: {doc['rrf_score']:.4f}, Vektör Sırası: {doc['v_rank']}, BM25 Sırası: {doc['b_rank']})*")
                             st.caption(f"\"{doc['text']}\"")
+
+    if "semantic_cache" not in st.session_state:
+    st.session_state.semantic_cache = GazaliSemanticCache(threshold=0.94)                        
         
         # Kullanıcı Girdisi
         user_query = st.chat_input("İmam Gazali felsefesi veya e-kitaplarınız hakkında sorun...")
@@ -340,22 +461,44 @@ with tab1:
             st.chat_message("user").write(user_query)
             st.session_state.chat_history.append({"role": "user", "content": user_query})
             
-            # 2. Arka planda Hibrit Arama yap
-            with st.spinner("📚 Yerel arşiviniz taranıyor..."):
-                retrieved_docs = run_hybrid_search(user_query, top_k=4)
+            # --- ⚡ SEMANTİK ÖNBELLEK KONTROLÜ ---
+            # Kullanıcı sorgusunu e5 modeliyle vektörleştiriyoruz
+            formatted_query = f"query: {user_query}"
+            query_vector = embed_model.encode(formatted_query).tolist()
+            
+            # Önbellekte semantik eşleşme arıyoruz
+            cached_response, similarity_score = st.session_state.semantic_cache.check_cache(user_query, query_vector)
+            
+            if cached_response:
+                # ⚡ CACHE HIT! Yanıtı veritabanına ve LLM'e gitmeden anında dönüyoruz (~5ms)
+                with st.chat_message("assistant"):
+                    st.markdown(f"**⚡ Semantik Önbellekten Yanıtlandı (Semantik Benzerlik: %{similarity_score*100:.1f})**")
+                    st.markdown(cached_response)
                 
-            if not retrieved_docs:
-                response_text = "Arşivinizde bu konuyla ilişkili hiçbir belge veya kitap bulunamadı."
-                st.chat_message("assistant").write(response_text)
-                st.session_state.chat_history.append({"role": "assistant", "content": response_text, "sources": []})
+                # Geçmişe kaydet (sources boş)
+                st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "content": f"⚡ Semantik Önbellekten Yanıtlandı (Semantik Benzerlik: %{similarity_score*100:.1f})\n\n" + cached_response,
+                    "sources": []
+                })
             else:
-                # 3. Gemini Prompt İnşa Et
-                context_str = ""
-                for doc in retrieved_docs:
-                    source_label = f"[{doc['book']} (Sayfa {doc['page']})]" if doc['book'] else f"[[{doc['title']}]]"
-                    context_str += f"\n--- KAYNAK: {source_label} ---\nİçerik: {doc['text']}\n------------------------\n"
+                # ❄️ CACHE MISS! Normal RAG ve LLM Sürecini çalıştır
+                # 2. Arka planda Hibrit Arama yap
+                with st.spinner("📚 Yerel arşiviniz taranıyor..."):
+                    retrieved_docs = run_hybrid_search(user_query, top_k=4)
                     
-                system_instruction = """Sen İmam Gazali felsefesi ve teolojisi üzerine uzmanlaşmış, akademik dürüstlüğü en üst düzeyde tutan bir yapay zeka asistanısın.
+                if not retrieved_docs:
+                    response_text = "Arşivinizde bu konuyla ilişkili hiçbir belge veya kitap bulunamadı."
+                    st.chat_message("assistant").write(response_text)
+                    st.session_state.chat_history.append({"role": "assistant", "content": response_text, "sources": []})
+                else:
+                    # 3. Gemini Prompt İnşa Et
+                    context_str = ""
+                    for doc in retrieved_docs:
+                        source_label = f"[{doc['book']} (Sayfa {doc['page']})]" if doc['book'] else f"[[{doc['title']}]]"
+                        context_str += f"\n--- KAYNAK: {source_label} ---\nİçerik: {doc['text']}\n------------------------\n"
+                        
+                    system_instruction = """Sen İmam Gazali felsefesi ve teolojisi üzerine uzmanlaşmış, akademik dürüstlüğü en üst düzeyde tutan bir yapay zeka asistanısın.
 Görevin, kullanıcının sorusuna SADECE sana sunulan 'KAYNAK NOTLAR' kapsamındaki verileri kullanarak yanıt vermektir.
 
 Uyman Gereken Kesin Kurallar:
@@ -366,7 +509,7 @@ Uyman Gereken Kesin Kurallar:
 5. Tamamen Türkçe yanıt ver ve akademik, saygın bir dil kullan.
 """
 
-                user_prompt = f"""Kullanıcı Sorusu: {user_query}
+                    user_prompt = f"""Kullanıcı Sorusu: {user_query}
 
 Sana Sunulan Kaynak Notlar:
 ==================================================
@@ -375,36 +518,40 @@ Sana Sunulan Kaynak Notlar:
 
 Yukarıdaki kaynak notlara ve kurallara tamamen bağlı kalarak soruyu yanıtla:"""
 
-                # 4. Gemini 3.x ile cevap üret
-                try:
-                    with st.spinner("🔮 Gemini anlamsal sentez gerçekleştiriyor..."):
-                        model = genai.GenerativeModel(
-                            model_name=st.session_state.selected_model,
-                            system_instruction=system_instruction
-                        )
-                        response = model.generate_content(
-                            contents=user_prompt,
-                            generation_config=genai.types.GenerationConfig(temperature=0.1)
-                        )
-                        response_text = response.text
-                        
-                        # Asistan cevabını göster
-                        with st.chat_message("assistant"):
-                            st.markdown(response_text)
-                            with st.expander("📚 Grounding (Vektörel & BM25 Kaynak Atıfları)"):
-                                for doc in retrieved_docs:
-                                    source_header = f"📌 {doc['book']} | Sayfa: {doc['page']}" if doc['book'] else f"📌 Obsidian Notu: [[{doc['title']}]]"
-                                    st.markdown(f"**{source_header}** *(RRF Skoru: {doc['rrf_score']:.4f}, Vektör Sırası: {doc['v_rank']}, BM25 Sırası: {doc['b_rank']})*")
-                                    st.caption(f"\"{doc['text']}\"")
-                                    
-                        # Geçmişe kaydet
-                        st.session_state.chat_history.append({
-                            "role": "assistant",
-                            "content": response_text,
-                            "sources": retrieved_docs
-                        })
-                except Exception as e:
-                    st.error(f"Yapay zeka cevap üretirken hata oluştu: {e}")
+                    # 4. Gemini 3.x ile cevap üret
+                    try:
+                        with st.spinner("🔮 Gemini anlamsal sentez gerçekleştiriyor..."):
+                            model = genai.GenerativeModel(
+                                model_name=st.session_state.selected_model,
+                                system_instruction=system_instruction
+                            )
+                            response = model.generate_content(
+                                contents=user_prompt,
+                                generation_config=genai.types.GenerationConfig(temperature=0.1)
+                            )
+                            response_text = response.text
+                            
+                            # 💾 Yeni üretilen yanıtı bir sonraki aramalar için önbelleğe yazıyoruz
+                            st.session_state.semantic_cache.set_cache(user_query, response_text, query_vector)
+                            
+                            # Asistan cevabını göster
+                            with st.chat_message("assistant"):
+                                st.markdown(response_text)
+                                with st.expander("📚 Grounding (Vektörel & BM25 Kaynak Atıfları)"):
+                                    for doc in retrieved_docs:
+                                        source_header = f"📌 {doc['book']} | Sayfa: {doc['page']}" if doc['book'] else f"📌 Obsidian Notu: [[{doc['title']}]]"
+                                        st.markdown(f"**{source_header}** *(RRF Skoru: {doc['rrf_score']:.4f}, Vektör Sırası: {doc['v_rank']}, BM25 Sırası: {doc['b_rank']})*")
+                                        st.caption(f"\"{doc['text']}\"")
+                                        
+                            # Geçmişe kaydet
+                            st.session_state.chat_history.append({
+                                "role": "assistant",
+                                "content": response_text,
+                                "sources": retrieved_docs
+                            })
+                    except Exception as e:
+                        st.error(f"Yanıt üretilirken bir hata oluştu: {e}")
+
 
 # ---------------------------------------------------------------------
 # TAB 2: AKADEMİK CO-WRITER (YAZAR)
@@ -477,31 +624,35 @@ Yukarıdaki kurallara ve şablona tamamen bağlı kalarak kapsamlı akademik mak
                                 contents=user_prompt,
                                 generation_config=genai.types.GenerationConfig(temperature=0.2)
                             )
-                            generated_text = response.text
-                            
+                            st.session_state.co_writer_result = response.text
+                            st.session_state.co_writer_topic_saved = article_topic
+                            st.session_state.co_writer_format_saved = output_format
                             st.success("Makale Taslağı Başarıyla Üretildi! 🎉")
-                            st.write("---")
-                            st.markdown(generated_text)
-                            st.write("---")
-                            
-                            # İndirme Butonu Hazırlama
-                            if "Word" in output_format:
-                                file_stream = generate_docx_stream(article_topic, generated_text)
-                                st.download_button(
-                                    label="📥 Word Dosyası Olarak İndir (.docx)",
-                                    data=file_stream,
-                                    file_name=f"gazali_{article_topic.replace(' ', '_').lower()}.docx",
-                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                                )
-                            else:
-                                st.download_button(
-                                    label="📥 Markdown Dosyası Olarak İndir (.md)",
-                                    data=generated_text,
-                                    file_name=f"gazali_{article_topic.replace(' ', '_').lower()}.md",
-                                    mime="text/markdown"
-                                )
                     except Exception as e:
                         st.error(f"Yazım sırasında bir hata oluştu: {e}")
+
+        # Sekme geçişlerinde makale sonucunu koruma
+        if st.session_state.co_writer_result:
+            st.write("---")
+            st.markdown(st.session_state.co_writer_result)
+            st.write("---")
+            
+            # İndirme Butonu Hazırlama
+            if "Word" in st.session_state.co_writer_format_saved:
+                file_stream = generate_docx_stream(st.session_state.co_writer_topic_saved, st.session_state.co_writer_result)
+                st.download_button(
+                    label="📥 Word Dosyası Olarak İndir (.docx)",
+                    data=file_stream,
+                    file_name=f"gazali_{st.session_state.co_writer_topic_saved.replace(' ', '_').lower()}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+            else:
+                st.download_button(
+                    label="📥 Markdown Dosyası Olarak İndir (.md)",
+                    data=st.session_state.co_writer_result,
+                    file_name=f"gazali_{st.session_state.co_writer_topic_saved.replace(' ', '_').lower()}.md",
+                    mime="text/markdown"
+                )
 
 # ---------------------------------------------------------------------
 # TAB 3: İNTERAKTİF KAVRAM AĞ HARİTASI
@@ -528,3 +679,136 @@ with tab3:
         st.warning("Ölçeklenebilir interaktif haritayı göremiyorsanız lütfen önce 'gazali_network_analysis.py' dosyasını çalıştırın.")
     else:
         st.warning("Henüz oluşturulmuş bir ağ görseli bulunamadı. Lütfen önce 'gazali_network_analysis.py' betiğini çalıştırın.")
+
+
+# ---------------------------------------------------------------------
+# TAB 4: AYET & HADİS & ŞAHIS ANALİTİĞİ (NER)
+# ---------------------------------------------------------------------
+with tab4:
+    st.subheader("📜 Yapay Zekâ Destekli Ayet, Hadis ve Şahıs Analitiği")
+    st.caption("Külliyatta geçen ayetleri, hadis-i şerifleri ve felsefi/tarihi şahsiyetleri yapay zekâ ile otomatik ayıklar ve listeler.")
+    
+    if not st.session_state.api_key_valid:
+        st.info("👉 Devam etmek için lütfen sol panelden geçerli bir Gemini API anahtarı girin.")
+    else:
+        # Seçenekler
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            ner_topic = st.text_input("🔍 Taranacak Akademik Konu:", placeholder="Örn: ilim ve amel, kalbin askerleri, nefs riyazeti, yaratılış")
+        with col2:
+            num_docs = st.slider("Tarama Kapsamı (Paragraf Sayısı):", min_value=3, max_value=8, value=5)
+            
+        if st.button("🚀 Tarama ve Analizi Başlat"):
+            if not ner_topic:
+                st.warning("Lütfen tarama yapılacak bir konu girin.")
+            else:
+                with st.spinner("🔍 Yerel kitaplar taranıyor ve ilgili paragraflar alınıyor..."):
+                    docs = run_hybrid_search(ner_topic, top_k=num_docs)
+                    
+                if not docs:
+                    st.error("Girdiğiniz konuyla ilişkili hiçbir kaynak bulunamadı.")
+                else:
+                    st.info(f"📚 Konuyla en ilişkili {len(docs)} paragraf başarıyla çekildi. Yapay zekâ ayıklama (NER) motoru çalıştırılıyor...")
+                    
+                    # Sentezlenecek metni birleştir
+                    context_str = ""
+                    for doc in docs:
+                        label = f"[{doc['book']} (Sayfa {doc['page']})]" if doc['book'] else f"[[{doc['title']}]]"
+                        context_str += f"\n--- KAYNAK: {label} ---\n{doc['text']}\n--------------------\n"
+                        
+                    system_instruction = """Sen klasik İslami metinler ve teoloji üzerinde uzmanlaşmış, son derece hassas bir metin analitiği (Named Entity Recognition) asistanısın.
+Görevin, sana sunulan kaynak metinleri analiz ederek içindeki:
+1. AYETLERİ (Eğer varsa; sure adı, ayet numarası, Türkçe meali ve geçtiği kaynak ile birlikte)
+2. HADİSLERİ (Eğer varsa; hadisin içeriği, ravisi veya kaynağı, geçtiği yer ile birlikte)
+3. ŞAHISLARI (Metinde adı geçen tarihi alimler, filozoflar, peygamberler, sahabeler veya şahsiyetler)
+bulup ayıklamaktır.
+
+Çıktıyı KESİNLİKLE ama KESİNLİKLE sadece aşağıdaki JSON şablonuna göre üretmelisin. JSON dışında hiçbir giriş, açıklama, markdown kodu veya düz metin yazmamalısın. Çıktı doğrudan geçerli bir JSON olmalıdır:
+{
+  "ayetler": [
+    {"sure_ayet": "Sure Adı ve Ayet No", "metin": "Ayeti kerimenin meali veya içeriği", "kaynak": "Geçtiği kitap/not ve sayfa"}
+  ],
+  "hadisler": [
+    {"metin": "Hadis-i şerifin meali veya içeriği", "ravi_kaynak": "Zikredilen ravi veya hadis kaynağı", "kaynak": "Geçtiği kitap/not ve sayfa"}
+  ],
+  "sahislar": [
+    {"isim": "Kişinin Adı", "rol_baglam": "Metindeki rolü veya hangi bağlamda zikredildiği", "kaynak": "Geçtiği kitap/not ve sayfa"}
+  ]
+}
+
+Eğer metinde ayet, hadis veya şahıs yoksa, ilgili listeyi boş bırak: []
+"""
+
+                    user_prompt = f"""Analiz Edilecek Kaynak Metinler:\n==================================================\n{context_str}\n==================================================\n\nYukarıdaki kaynakları tara ve JSON formatında ayıklama sonuçlarını döndür:"""
+                    
+                    try:
+                        with st.spinner("🔮 Yapay zekâ anlamsal varlık ayıklama (NER) gerçekleştiriyor..."):
+                            model = genai.GenerativeModel(
+                                model_name=st.session_state.selected_model,
+                                system_instruction=system_instruction
+                            )
+                            response = model.generate_content(
+                                contents=user_prompt,
+                                generation_config=genai.types.GenerationConfig(
+                                    temperature=0.1,
+                                    response_mime_type="application/json"
+                                )
+                            )
+                            
+                            raw_json = response.text.strip()
+                            if raw_json.startswith("```json"):
+                                raw_json = raw_json.split("```json", 1)[1]
+                            if raw_json.endswith("```"):
+                                raw_json = raw_json.rsplit("```", 1)[0]
+                            raw_json = raw_json.strip()
+                            
+                            data = json.loads(raw_json)
+                            st.session_state.ner_results = data
+                            st.session_state.ner_raw_docs = docs
+                            st.session_state.ner_topic_saved = ner_topic
+                            st.success("Analiz Başarıyla Tamamlandı! 🎉")
+                                    
+                    except Exception as e:
+                        st.error(f"NER analizi sırasında bir hata oluştu: {e}")
+
+        # Sekme geçişlerinde sonuçları ekranda tutma
+        if st.session_state.ner_results:
+            data = st.session_state.ner_results
+            docs = st.session_state.ner_raw_docs
+            
+            # 1. AYETLER
+            st.markdown("### 📖 Ayet-i Kerîmeler")
+            ayet_list = data.get("ayetler", [])
+            if ayet_list:
+                df_ayet = pd.DataFrame(ayet_list)
+                df_ayet.columns = ["Sure / Ayet No", "Ayet Meali / Metni", "Geçtiği Kaynak"]
+                st.dataframe(df_ayet, use_container_width=True)
+            else:
+                st.info("Taranan paragraflarda doğrudan ayet-i kerîme atfı tespit edilemedi.")
+                
+            # 2. HADİSLER
+            st.markdown("### 💬 Hadîs-i Şerîfler")
+            hadis_list = data.get("hadisler", [])
+            if hadis_list:
+                df_hadis = pd.DataFrame(hadis_list)
+                df_hadis.columns = ["Hadis-i Şerif Metni", "Ravi / Kaynak", "Geçtiği Kaynak"]
+                st.dataframe(df_hadis, use_container_width=True)
+            else:
+                st.info("Taranan paragraflarda doğrudan hadîs-i şerîf atfı tespit edilemedi.")
+                
+            # 3. ŞAHISLAR
+            st.markdown("### 👤 Tarihi Şahsiyetler & Alimler")
+            sahis_list = data.get("sahislar", [])
+            if sahis_list:
+                df_sahis = pd.DataFrame(sahis_list)
+                df_sahis.columns = ["İsim", "Metindeki Rolü / Bağlam", "Geçtiği Kaynak"]
+                st.dataframe(df_sahis, use_container_width=True)
+            else:
+                st.info("Taranan paragraflarda özel şahıs/alim atfı tespit edilemedi.")
+                
+            # Kaynak Metinleri gösteren genişletici
+            with st.expander("📝 Taranan Paragrafların Ham Metinleri"):
+                for d in docs:
+                    lbl = f"📌 {d['book']} | Sayfa: {d['page']}" if d['book'] else f"📌 Obsidian: [[{d['title']}]]"
+                    st.markdown(f"**{lbl}**")
+                    st.caption(f'"{d["text"]}"')
