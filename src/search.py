@@ -44,20 +44,68 @@ def translate_expand_query(query):
         
     return combined_translation, True, clean_q
 
+def expand_query_for_gazali(query):
+    """
+    Modern Türkçe bir sorguyu, Gazali'nin tercüme eserlerindeki klasik felsefi,
+    anatomik ve tasavvufi karşılıklarıyla genişletir. Böylece kullanıcının güncel
+    diliyle korpusun klasik dili arasındaki boşluk kapatılır ve retrieval isabeti artar.
+
+    Yalnızca geçerli bir API anahtarı aktifken (st.session_state.api_key_valid)
+    çalışır; aksi halde (örn. offline evaluator) orijinal sorguyu aynen döndürür.
+    Bu sayede genişletme, çevrimdışı test yolunu yavaşlatmaz.
+    """
+    if not st.session_state.get("api_key_valid", False):
+        return query
+
+    prompt = f"""Kullanıcı sorgusu: "{query}"
+
+İmam Gazali'nin eserlerinin Türkçe tercümelerinde (özellikle Kimyâ-yı Saâdet, el-Munkız gibi felsefi ve tasavvufi bölümlerde) kullanılan klasik terminolojiyi düşün.
+Bu sorgudaki kavramları, Gazali'nin kullanabileceği tarihsel, anatomik ve felsefi kelimelerle genişlet.
+
+Örnekler:
+- "Kan dolaşımı" -> "kan dolaşımı damar şerayin evride kebid karaciğer yürek kalp ruh-ı hayvani hayati buhar"
+- "insanın kimyası" -> "insanın kimyası beden yapısı mizaç anasır-ı erbaa organlar hizmetçiler askerler nefs"
+- "beyin fonksiyonları" -> "beyin dimağ hissi müşterek dimağın önü hayal vehm hafıza koruyucu güç"
+
+Sadece genişletilmiş arama terimlerini içeren, açıklama içermeyen, boşluklarla ayrılmış tek bir düz metin satırı döndür.
+Genişletilmiş Sorgu:"""
+
+    try:
+        model = genai.GenerativeModel(st.session_state.get("selected_model"))
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(temperature=0.1)
+        )
+        expanded_terms = response.text.strip().replace("\n", " ")
+        if not expanded_terms:
+            return query
+        # Orijinal sorgu ile genişletilmiş terimleri birleştir (anlam çıpasını koru)
+        return f"{query} {expanded_terms}"
+    except Exception:
+        return query
+
+
 def run_hybrid_search(embed_model, collection, bm25_engine, all_data, query, top_k=4):
-    """BM25 ve Vektör (E5) sıralamalarını RRF formülüyle sentezler. Arapça sorgularda çapraz dilli arama yapar."""
+    """BM25 ve Vektör (E5) sıralamalarını RRF formülüyle sentezler. Arapça sorgularda
+    çapraz dilli arama, modern Türkçe sorgularda ise klasik terminoloji genişletmesi yapar."""
     if not collection or not bm25_engine or not all_data:
         return []
-        
+
     bm25_query = query
     vector_query = query
-    
+
     translated_q, is_arabic, original_arabic = translate_expand_query(query)
     if is_arabic:
         bm25_query = translated_q
         vector_query = f"{query} {translated_q}"
         st.info(f"🌐 **Arapça Arama Tespit Edildi:**\n• Orijinal Arapça: `{query}`\n• Türkçe Genişletme: `{translated_q}`\n\n*Çapraz Dilli (Cross-lingual) Hibrit motorumuz, hem orijinal terimi vektör uzayında tarar hem de otomatik çeviri üzerinden yerel BM25 indekslemesi gerçekleştirir.*")
-        
+    else:
+        # Modern Türkçe sorgular için klasik terminoloji genişletmesi (yalnızca API aktifse)
+        expanded = expand_query_for_gazali(query)
+        if expanded != query:
+            bm25_query = expanded
+            vector_query = expanded
+
     bm25_scores = bm25_engine.get_scores(bm25_query)
     bm25_ranked = sorted(range(len(bm25_scores)), key=lambda k: bm25_scores[k], reverse=True)
     
