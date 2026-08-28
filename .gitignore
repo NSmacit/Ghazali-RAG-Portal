@@ -33,3 +33,6 @@ venv/
 ENV/
 .pytest_cache/
 .DS_Store
+
+# Streamlit gizli anahtarlar (asla commit edilmez)
+.streamlit/secrets.toml

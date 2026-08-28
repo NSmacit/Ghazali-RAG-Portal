@@ -1,0 +1,44 @@
+# =====================================================================
+# GAZÂLÎ PORTAL — Premium Dark Theme
+# Klasik İslâmî ilim estetiği: derin mürekkep zemin, zümrüt-teal + altın vurgu,
+# Lora (serif başlıklar) + Mulish (gövde). Google Fonts üzerinden yüklenir.
+# =====================================================================
+[theme]
+base = "dark"
+primaryColor = "#14b8a6"                 # teal-500 — butonlar, aktif ögeler (beyaz metinle kontrastlı)
+backgroundColor = "#0d1417"              # derin mürekkep (hafif teal tonlu)
+secondaryBackgroundColor = "#141c20"     # kartlar, widget zeminleri
+textColor = "#e8efec"                    # yumuşak kırık-beyaz
+linkColor = "#2dd4bf"                    # teal-300
+codeBackgroundColor = "#11181b"
+codeTextColor = "#d6e2dd"
+borderColor = "#233036"
+
+font = "Mulish:https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600;700&display=swap"
+headingFont = "Lora:https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&display=swap"
+codeFont = "'JetBrains Mono':https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+
+baseFontSize = 15
+baseRadius = "10px"
+buttonRadius = "10px"
+showWidgetBorder = true
+showSidebarBorder = true
+linkUnderline = false
+
+# Semantik renk paleti (altın vurgusu dahil)
+greenColor = "#34d399"
+yellowColor = "#e0b64d"
+orangeColor = "#e0913d"
+redColor = "#f2795b"
+blueColor = "#38bdf8"
+violetColor = "#a78bfa"
+
+chartCategoricalColors = ["#14b8a6", "#e0b64d", "#38bdf8", "#a78bfa", "#f2795b", "#34d399", "#94a3b8"]
+
+[theme.sidebar]
+backgroundColor = "#0a1012"
+secondaryBackgroundColor = "#111a1d"
+codeBackgroundColor = "#0f1719"
+textColor = "#dde7e3"
+borderColor = "#1c2a2f"
+primaryColor = "#14b8a6"
