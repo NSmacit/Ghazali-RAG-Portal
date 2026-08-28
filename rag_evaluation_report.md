@@ -8,7 +8,7 @@ Bu rapor, **İslâmî Beşerî Bilimler & Yapay Zekâ Portalı** bünyesinde ça
 | :--- | :--- | :--- |
 | **Toplam Paragraf Kapsamı** | 3916 Paragraf (Chunk) | ✅ Enterprise |
 | **Genel Test Başarı Oranı** | %100.0 (4/4) | ✅ MÜKEMMEL |
-| **Ortalama Sorgu Gecikmesi** | 699.4 ms | ⚠️ İYİLEŞTİRİLMELİ |
+| **Ortalama Sorgu Gecikmesi** | 353.3 ms | ✅ ONAYLANDI (< 500ms) |
 | **Sözlük Genişletme Kalitesi** | %100 Çapraz Dilli Entegrasyon | ✅ Aktif |
 
 ---
@@ -18,7 +18,7 @@ Bu rapor, **İslâmî Beşerî Bilimler & Yapay Zekâ Portalı** bünyesinde ça
 ### [TC-001] Nefs ve Kalp İlişkisi (Tasavvuf Epistemolojisi)
 * **Sorgu Terimi:** `kalbin hakikati ve marifetü'n-nefs`
 * **Test Durumu:** **✅ BAŞARILI (PASSED)**
-* **Sorgu Gecikmesi (Latency):** `1433.42 ms` (Eşik Değeri < 800ms: ❌)
+* **Sorgu Gecikmesi (Latency):** `340.01 ms` (Eşik Değeri < 800ms: ✅)
 * **Yakalanan Anahtar Terimler:** `2` adet terim yakalandı. (nefs, ruh)
 * **Beklenen Eser Eşleşmesi:** ✅ Başarılı
 
@@ -26,7 +26,7 @@ Bu rapor, **İslâmî Beşerî Bilimler & Yapay Zekâ Portalı** bünyesinde ça
 ### [TC-002] Arapça-Türkçe Çapraz Dilli Arama (Cross-Lingual)
 * **Sorgu Terimi:** `الشك`
 * **Test Durumu:** **✅ BAŞARILI (PASSED)**
-* **Sorgu Gecikmesi (Latency):** `719.03 ms` (Eşik Değeri < 800ms: ✅)
+* **Sorgu Gecikmesi (Latency):** `439.97 ms` (Eşik Değeri < 800ms: ✅)
 * **Yakalanan Anahtar Terimler:** `4` adet terim yakalandı. (şüphe, kriz, akıl, duyu)
 * **Beklenen Eser Eşleşmesi:** ✅ Başarılı
 
@@ -34,7 +34,7 @@ Bu rapor, **İslâmî Beşerî Bilimler & Yapay Zekâ Portalı** bünyesinde ça
 ### [TC-003] Eyyühe'l-Veled (Nasihat ve Amel)
 * **Sorgu Terimi:** `ey oğul ilim ve amel`
 * **Test Durumu:** **✅ BAŞARILI (PASSED)**
-* **Sorgu Gecikmesi (Latency):** `340.29 ms` (Eşik Değeri < 800ms: ✅)
+* **Sorgu Gecikmesi (Latency):** `334.43 ms` (Eşik Değeri < 800ms: ✅)
 * **Yakalanan Anahtar Terimler:** `3` adet terim yakalandı. (oğul, ilim, amel)
 * **Beklenen Eser Eşleşmesi:** ✅ Başarılı
 
@@ -42,7 +42,7 @@ Bu rapor, **İslâmî Beşerî Bilimler & Yapay Zekâ Portalı** bünyesinde ça
 ### [TC-004] Filozofların Tutarsızlığı (Yeni Entegre Edilen Eser)
 * **Sorgu Terimi:** `filozofların tutarsızlığı ve metafizik iddialar`
 * **Test Durumu:** **✅ BAŞARILI (PASSED)**
-* **Sorgu Gecikmesi (Latency):** `304.82 ms` (Eşik Değeri < 800ms: ✅)
+* **Sorgu Gecikmesi (Latency):** `298.69 ms` (Eşik Değeri < 800ms: ✅)
 * **Yakalanan Anahtar Terimler:** `3` adet terim yakalandı. (filozof, tutarsızlık, tehafüt)
 * **Beklenen Eser Eşleşmesi:** ✅ Başarılı
 

@@ -129,6 +129,18 @@ results = []
 total_latency = 0
 passed_tests = 0
 
+# =====================================================================
+# ISINMA (WARMUP) SORGUSU
+# =====================================================================
+# İlk sorgu daima model + ilk encode ısınma maliyetini (lazy init, tensor
+# tahsisi, ChromaDB ilk erişim) taşır. Bu maliyet retrieval kalitesiyle
+# ilgisizdir ve ölçülen ortalamayı yanıltır. Zamanlanmış testlerden önce
+# tek bir atılabilir sorgu koşarak sistemi kararlı duruma getiriyoruz.
+print("\n[*] Isınma (warmup) sorgusu koşturuluyor (ölçüme dahil edilmez)...")
+_warmup_start = time.time()
+run_hybrid_search(embed_model, collection, bm25_engine, all_data, "ilim ve amel", top_k=4)
+print(f"[+] Isınma tamamlandı: {(time.time() - _warmup_start) * 1000:.1f} ms")
+
 print("\n[*] Test Senaryoları Koşturuluyor...")
 print("-" * 60)
 
