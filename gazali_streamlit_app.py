@@ -245,8 +245,9 @@ def _hero(title, subtitle):
 def _api_gate():
     """API anahtari yoksa nazik bir uyari gosterir ve True dondurur (durdur)."""
     if not st.session_state.api_key_valid:
-        st.info("Bu bölümü kullanmak için sol panelden geçerli bir Gemini API anahtarı girin.",
-                icon=":material/vpn_key:")
+        st.info("Bu bölüm yapay zekâ kullanır (premium). Sol panelden bir Gemini API anahtarı girerek "
+                "deneyebilir ya da **Keşfet & Ara** sekmesinden kaynakları ücretsiz araştırabilirsiniz.",
+                icon=":material/lock:")
         return True
     return False
 
@@ -287,7 +288,50 @@ def _render_sources(docs, label="Kaynak atıfları (Vektör + BM25)"):
 
 
 # =====================================================================
-# 4. SAYFA: AKADEMİK SOHBET (CHATBOT)
+# 4. SAYFA: KEŞFET & ARA (Ücretsiz — LLM yok, API anahtarı gerekmez)
+# =====================================================================
+def page_search():
+    _hero("Keşfet & Ara", "Gazâlî külliyatını kaynağıyla ara — kayıt ve API anahtarı gerekmez, tamamen ücretsiz.")
+
+    q = st.text_input(
+        "Ara", placeholder="Örn: kalbin hakikati, yakîn, ilim ve amel, filozofların tutarsızlığı…",
+        label_visibility="collapsed", icon=":material/search:",
+    )
+
+    # Bos durumda ilham verici konu cipleri
+    if not q:
+        picked = st.pills(
+            "Konular",
+            ["nefsin bilinmesi", "yakîn ve şüphe", "ilim ve amel",
+             "kalbin hakikati", "riyâzet ve nefs terbiyesi", "tevekkül"],
+            label_visibility="collapsed", key="search_topics",
+        )
+        if picked:
+            q = picked
+
+    if not q:
+        st.caption("Bir kavram veya soru yazın; sistem en ilgili paragrafları eser ve sayfa künyesiyle listeler.")
+        return
+
+    with st.spinner("Külliyat taranıyor…"):
+        docs = run_hybrid_search(q, top_k=8)
+
+    if not docs:
+        st.info("Bu sorguyla ilişkili paragraf bulunamadı.", icon=":material/search_off:")
+        return
+
+    st.caption(f"{len(docs)} ilgili paragraf")
+    for d in docs:
+        with st.container(border=True):
+            src = d["book"] if d["book"] else f"Obsidian notu: [[{d['title']}]]"
+            page = f" · Sayfa {d['page']}" if d.get("page") and d["page"] != "Bilinmiyor" else ""
+            st.markdown(f":material/bookmark: **{src}**{page}")
+            st.write(d["text"])
+            st.caption(f":gray[RRF {d['rrf_score']:.4f} · Vektör #{d['v_rank']} · BM25 #{d['b_rank']}]")
+
+
+# =====================================================================
+# 5. SAYFA: AKADEMİK SOHBET (CHATBOT)
 # =====================================================================
 SUGGESTIONS = {
     ":material/psychology: Şüphe krizi ve kesin bilgi (yakîn) arayışı":
@@ -669,7 +713,8 @@ with st.sidebar:
 
 # Bolum navigasyonu (st.navigation menusu sidebar'in ustune yerlesir)
 pages = [
-    st.Page(page_chat, title="Sohbet", icon=":material/forum:", default=True),
+    st.Page(page_search, title="Keşfet & Ara", icon=":material/search:", default=True),
+    st.Page(page_chat, title="Sohbet", icon=":material/forum:"),
     st.Page(page_cowriter, title="Co-Writer", icon=":material/edit_note:"),
     st.Page(page_network, title="Ağ Haritası", icon=":material/hub:"),
     st.Page(page_analytics, title="Analitik", icon=":material/travel_explore:"),
