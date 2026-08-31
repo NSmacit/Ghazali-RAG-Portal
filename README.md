@@ -46,6 +46,7 @@ graph TD
     %% UI & Processing Layer
     subgraph Application_Layer [3. Academic Portal & Analytics UI]
         O --> P[Streamlit Web App]
+        P --> U[0. Keşfet & Ara: Free Keyless Passage Search - no LLM]
         P --> Q[1. Chatbot: Grounded Zero-Hallucination QA]
         P --> R[2. Co-Writer: Automated Academic Paper Drafts]
         P --> S[3. NER: Named Entity Extractor - Ayah/Hadith/Scholars]
@@ -57,6 +58,21 @@ graph TD
     class E database;
     class N,I,F,L,M engine;
 ```
+
+---
+
+## 🆕 Free Search Tier & Structured İhyâ Ingestion
+
+Recent work moves the platform closer to a genuine **"digital brain" for Al-Ghazali's corpus** — reachable from one place, without drowning in thousands of pages.
+
+### 🔍 Keşfet & Ara — Free, Keyless Search Tier
+A zero-cost retrieval view (**no login, no API key, no LLM call**) that lets anyone search the full corpus with the local hybrid engine and read the most relevant passages **with `eser / kitap / page` citations**. Because it runs entirely on the local BM25 + E5 pipeline, it costs nothing to serve — the free tier of a free/premium split where the LLM-powered features (grounded chat, co-writer, entity analytics) are the paid upgrade.
+
+### 📗 Structure-Aware İhyâ'u Ulûmi'd-Dîn Ingestion
+The magnum opus **İhyâ'u Ulûmi'd-Dîn (vol. 1 — Rub'u'l-İbâdât)** is ingested by a dedicated MPS-accelerated pipeline (`gazali_ihya_ingester.py`) that tags every passage with its canonical book — *Kitâbü'l-İlim, Kavâidü'l-Akâid, Esrâru't-Tahâre, Esrâru's-Salât …* — via robust page-range mapping. This per-book metadata (`eser / cilt / kitap / page`) enables precise scholarly citation and future per-book filtering.
+
+### 🧹 Data-Quality Discipline
+The free search immediately surfaced a corrupted source (a Kimyâ-yı Saâdet PDF whose text layer split words at the glyph level). A maintenance pass (`gazali_purge_corrupted_kimya.py`) removed the unreadable chunks while preserving the clean passages — the corpus favors **fidelity over raw size**.
 
 ---
 
